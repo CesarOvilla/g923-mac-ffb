@@ -48,22 +48,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!();
 
-    // ── Telemetría ───────────────────────────────────────────────
-    println!("   Esperando telemetría de ATS...");
-    let mut telem = loop {
-        match TelemetryReader::open() {
-            Ok(r) => break r,
-            Err(_) => sleep(Duration::from_secs(2)),
-        }
-    };
-    println!("✓ Telemetría conectada.");
+    // ── Wheel + Telemetría (esperar ambos, en cualquier orden) ──
+    println!("   Esperando G923 y telemetría de ATS...");
+    let mut api = HidApi::new()?;
+    let mut telem;
+    let dev;
 
-    // ── Wheel ────────────────────────────────────────────────────
-    let api = HidApi::new()?;
-    let dev = HidppDevice::open(&api)?;
+    // Esperar ambos sin importar el orden
+    loop {
+        let _ = api.refresh_devices();
+        let wheel_ok = HidppDevice::open(&api);
+        let telem_ok = TelemetryReader::open();
+
+        match (wheel_ok, telem_ok) {
+            (Ok(d), Ok(t)) => {
+                dev = d;
+                telem = t;
+                break;
+            }
+            (Ok(_), Err(_)) => {
+                println!("  ✓ G923 encontrado. Esperando ATS...");
+                sleep(Duration::from_secs(3));
+            }
+            (Err(_), Ok(_)) => {
+                println!("  ✓ Telemetría encontrada. Esperando G923...");
+                sleep(Duration::from_secs(3));
+            }
+            (Err(_), Err(_)) => {
+                sleep(Duration::from_secs(3));
+            }
+        }
+    }
+
     let ffb = ForceFeedback::new(&dev)?;
     ffb.reset_all()?;
     println!("✓ G923 FFB conectado (feature_idx={}).", ffb.feature_index());
+    println!("✓ Telemetría conectada.");
     println!();
     println!("   Maneja en ATS. Ctrl+C para salir.");
     println!("   Edita g923.toml para ajustar — recarga automática cada 5s.");
