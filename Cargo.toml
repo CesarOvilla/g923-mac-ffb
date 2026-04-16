@@ -48,5 +48,9 @@ path = "src/aperture.rs"
 name = "g923-envelope"
 path = "src/envelope.rs"
 
+[[bin]]
+name = "g923-input"
+path = "src/input.rs"
+
 [dependencies]
 hidapi = "2.6"
