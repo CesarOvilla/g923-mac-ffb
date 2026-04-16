@@ -57,6 +57,10 @@ name = "g923-telemetry-monitor"
 path = "src/telemetry_monitor.rs"
 
 [[bin]]
+name = "g923"
+path = "src/cli.rs"
+
+[[bin]]
 name = "g923-daemon"
 path = "src/daemon.rs"
 
