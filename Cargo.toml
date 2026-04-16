@@ -1,0 +1,52 @@
+[package]
+name = "g923-mac-ffb"
+version = "0.1.0"
+edition = "2021"
+description = "Userspace HID++ driver exploration for Logitech G923 Xbox on Apple Silicon"
+
+[lib]
+name = "g923_mac_ffb"
+path = "src/lib.rs"
+
+[[bin]]
+name = "g923-ping"
+path = "src/ping.rs"
+
+[[bin]]
+name = "g923-enumerate"
+path = "src/enumerate.rs"
+
+[[bin]]
+name = "g923-discover"
+path = "src/discover.rs"
+
+[[bin]]
+name = "g923-constant-force"
+path = "src/constant_force.rs"
+
+[[bin]]
+name = "g923-spring"
+path = "src/spring.rs"
+
+[[bin]]
+name = "g923-damper"
+path = "src/damper.rs"
+
+[[bin]]
+name = "g923-friction"
+path = "src/friction.rs"
+
+[[bin]]
+name = "g923-inertia"
+path = "src/inertia.rs"
+
+[[bin]]
+name = "g923-aperture"
+path = "src/aperture.rs"
+
+[[bin]]
+name = "g923-envelope"
+path = "src/envelope.rs"
+
+[dependencies]
+hidapi = "2.6"
