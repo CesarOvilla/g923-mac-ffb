@@ -16,8 +16,22 @@ INSTALL_DIR="$HOME/.local/bin"
 CONFIG_DIR="$HOME/.config/g923"
 ATS_PLUGINS="$HOME/Library/Application Support/Steam/steamapps/common/American Truck Simulator/American Truck Simulator.app/Contents/MacOS/plugins"
 
+# Detectar instalación previa
+if [ -f "$INSTALL_DIR/g923" ]; then
+    OLD_VER=$("$INSTALL_DIR/g923" version 2>/dev/null || echo "desconocida")
+    echo "⬆ Actualización detectada (versión anterior: $OLD_VER)"
+    echo "  Se actualizan binarios y plugin. Tu configuración NO se toca."
+    echo
+
+    # Detener daemon si está corriendo
+    "$INSTALL_DIR/g923" stop 2>/dev/null || true
+    sleep 1
+else
+    echo "📦 Instalación nueva."
+    echo
+fi
+
 # 1. Crear directorios
-echo "→ Creando directorios..."
 mkdir -p "$INSTALL_DIR"
 mkdir -p "$CONFIG_DIR"
 
@@ -28,7 +42,10 @@ cp "$DIR/g923" "$INSTALL_DIR/"
 cp "$DIR/G923FFB" "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/g923-daemon" "$INSTALL_DIR/g923" "$INSTALL_DIR/G923FFB"
 
-# 3. Copiar config si no existe
+NEW_VER=$("$INSTALL_DIR/g923" version 2>/dev/null || echo "")
+echo "  Versión instalada: $NEW_VER"
+
+# 3. Copiar config si no existe (nunca sobrescribir config del usuario)
 if [ ! -f "$CONFIG_DIR/g923.toml" ]; then
     echo "→ Creando configuración por defecto..."
     cp "$DIR/g923.toml" "$CONFIG_DIR/"

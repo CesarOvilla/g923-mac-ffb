@@ -30,6 +30,7 @@ fn main() {
         "log" => cmd_log(),
         "test" => cmd_test(),
         "uninstall" => cmd_uninstall(),
+        "version" => cmd_version(),
         "help" | "--help" | "-h" => cmd_help(),
         other => {
             eprintln!("Comando desconocido: {other}");
@@ -50,6 +51,7 @@ fn cmd_help() {
     println!("  install-service    Instala servicio launchctl (auto-start al login)");
     println!("  uninstall-service  Quita el servicio launchctl");
     println!("  uninstall          Desinstala TODO (binarios, config, servicio)");
+    println!("  version            Muestra la versión instalada");
     println!("  log                Muestra el log del daemon");
     println!("  test               Corre la suite de pruebas FFB");
     println!("  help               Muestra esta ayuda");
@@ -319,6 +321,10 @@ fn cmd_uninstall() {
     println!("✓ G923 FFB desinstalado completamente.");
     println!("  El plugin de ATS (g923_telemetry.dylib) sigue en el bundle del juego.");
     println!("  Puedes quitarlo manualmente si quieres.");
+}
+
+fn cmd_version() {
+    println!("g923-mac-ffb v{}", env!("CARGO_PKG_VERSION"));
 }
 
 fn cmd_log() {
