@@ -31,9 +31,14 @@ idle_amplitude = 500       # vibración en idle (motor encendido, parado)
 max_amplitude = 3000       # vibración máxima a RPM alto
 
 [ffb.surface]
-enabled = true             # habilitar baches por deflexión de suspensión
+enabled = false             # habilitar baches por deflexión de suspensión
 bump_gain = 0.5            # intensidad de los baches
 bump_duration_ms = 120     # duración de cada pulso de bache
 bump_threshold = 0.05     # cambio mínimo en suspensión para disparar bache
                            # subir si sientes pulsos en carretera lisa (0.03–0.05)
                            # bajar si no sientes baches reales (0.005–0.01)
+
+[ffb.weight]
+enabled = true             # FFB más pesado con carga, más ligero vacío
+reference_mass = 20000     # kg de referencia (a esta carga, multiplicador ≈ 1.5)
+max_multiplier = 1.8       # tope del multiplicador con carga muy pesada

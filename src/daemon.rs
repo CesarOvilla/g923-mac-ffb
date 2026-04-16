@@ -136,8 +136,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let speed_kmh = t.speed * 3.6;
 
+        // ── Multiplicador de peso ────────────────────────────────
+        let weight_mult = if cfg.weight.enabled && t.cargo_mass > 0.0 {
+            (1.0 + t.cargo_mass / cfg.weight.reference_mass).min(cfg.weight.max_multiplier)
+        } else {
+            1.0
+        };
+
         // ── Spring ───────────────────────────────────────────────
-        let coeff = ((cfg.spring.base + speed_kmh * cfg.spring.per_kmh).min(cfg.spring.max) * gain) as f32;
+        let coeff = (cfg.spring.base + speed_kmh * cfg.spring.per_kmh).min(cfg.spring.max) * gain * weight_mult;
         if (coeff - last_spring).abs() > cfg.spring.threshold || spring_slot.is_none() {
             if let Ok(s) = ffb.upload_spring(coeff as i16, 0xFFFF) {
                 if let Some(old) = spring_slot { let _ = ffb.destroy(old); }
@@ -157,7 +164,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // ── Lateral ──────────────────────────────────────────────
-        let raw = (t.accel_x * cfg.lateral.gain * gain).clamp(-cfg.lateral.max, cfg.lateral.max);
+        let raw = (t.accel_x * cfg.lateral.gain * gain * weight_mult).clamp(-cfg.lateral.max, cfg.lateral.max);
         smoothed_lateral = smoothed_lateral * cfg.lateral.smoothing + raw * (1.0 - cfg.lateral.smoothing);
         let lat = smoothed_lateral;
 
@@ -249,9 +256,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // ── Status ───────────────────────────────────────────────
         if last_status.elapsed() > Duration::from_secs(3) {
             println!(
-                "  {:>6.1} km/h | {:>5.0} rpm | spr {:>5} | dmp {:>5} | lat {:>+6} | vib {:>4} | bump {:>5}",
-                speed_kmh, t.rpm, coeff as i16, damp as i16, lat as i16,
-                vib_mag as i16, bump_force as i16,
+                "  {:>6.1} km/h | {:>5.0} rpm | spr {:>5} | lat {:>+6} | carga {:>5.0}kg x{:.1}",
+                speed_kmh, t.rpm, coeff as i16, lat as i16,
+                t.cargo_mass, weight_mult,
             );
             last_status = Instant::now();
         }

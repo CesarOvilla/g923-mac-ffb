@@ -30,6 +30,7 @@ pub struct FfbConfig {
     pub lateral: LateralConfig,
     pub vibration: VibrationConfig,
     pub surface: SurfaceConfig,
+    pub weight: WeightConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -96,6 +97,7 @@ impl Default for FfbConfig {
             lateral: LateralConfig::default(),
             vibration: VibrationConfig::default(),
             surface: SurfaceConfig::default(),
+            weight: WeightConfig::default(),
         }
     }
 }
@@ -121,6 +123,20 @@ impl Default for LateralConfig {
 impl Default for VibrationConfig {
     fn default() -> Self {
         Self { enabled: false, rpm_gain: 0.5, idle_amplitude: 500.0, max_amplitude: 3000.0 }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct WeightConfig {
+    pub enabled: bool,
+    pub reference_mass: f32,
+    pub max_multiplier: f32,
+}
+
+impl Default for WeightConfig {
+    fn default() -> Self {
+        Self { enabled: true, reference_mass: 20000.0, max_multiplier: 1.8 }
     }
 }
 
@@ -253,5 +269,10 @@ bump_duration_ms = 80      # duración de cada pulso de bache
 bump_threshold = 0.015     # cambio mínimo en suspensión para disparar bache
                            # subir si sientes pulsos en carretera lisa (0.03–0.05)
                            # bajar si no sientes baches reales (0.005–0.01)
+
+[ffb.weight]
+enabled = true             # FFB más pesado con carga, más ligero vacío
+reference_mass = 20000     # kg de referencia (a esta carga, multiplicador ≈ 1.5)
+max_multiplier = 1.8       # tope del multiplicador con carga muy pesada
 "#.to_string()
 }
