@@ -52,5 +52,27 @@ path = "src/envelope.rs"
 name = "g923-input"
 path = "src/input.rs"
 
+[[bin]]
+name = "g923-telemetry-monitor"
+path = "src/telemetry_monitor.rs"
+
+[[bin]]
+name = "g923-daemon"
+path = "src/daemon.rs"
+
+[[bin]]
+name = "g923-usb-test"
+path = "src/usb_test.rs"
+
+[[bin]]
+name = "g923-classic-test"
+path = "src/classic_test.rs"
+
+[[bin]]
+name = "g923-daemon-test"
+path = "src/daemon_test.rs"
+
 [dependencies]
-hidapi = "2.6"
+hidapi = { version = "2.6", features = ["linux-static-hidraw", "macos-shared-device"] }
+libc = "0.2"
+rusb = "0.9"

@@ -7,3 +7,4 @@
 
 pub mod ffb;
 pub mod hidpp;
+pub mod telemetry;
