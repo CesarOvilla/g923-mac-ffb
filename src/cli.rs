@@ -296,6 +296,9 @@ fn cmd_uninstall() {
         println!("  ✓ Servicio eliminado.");
     }
 
+    // Matar la menu bar app si está corriendo
+    let _ = Command::new("pkill").args(["-f", "G923FFB"]).status();
+
     // Eliminar binarios
     let bin_dir = env::var("HOME").unwrap_or_default();
     let bin_path = Path::new(&bin_dir).join(".local/bin");
