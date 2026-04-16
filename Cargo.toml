@@ -1,6 +1,6 @@
 [package]
 name = "g923-mac-ffb"
-version = "0.1.0"
+version = "0.1.0" # MVP: FFB funcional con ATS en macOS Apple Silicon
 edition = "2021"
 description = "Userspace HID++ driver exploration for Logitech G923 Xbox on Apple Silicon"
 

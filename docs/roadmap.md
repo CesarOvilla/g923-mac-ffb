@@ -1,6 +1,11 @@
 # Roadmap
 
-Estado al 2026-04-15.
+## MVP v0.1.0 — alcanzado 2026-04-16
+
+Force feedback funcional en American Truck Simulator con Logitech G923
+Xbox en macOS Apple Silicon. Spring proporcional a velocidad, fuerza
+lateral en curvas, damper anti-oscillation. 100% userspace, sin DriverKit,
+sin kexts, sin cuenta developer pagada.
 
 ## Fase 0 — Reconocimiento ✅
 
