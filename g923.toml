@@ -2,7 +2,7 @@
 # Edita estos valores y el daemon los recarga automáticamente (cada 5s).
 
 [ffb]
-global_gain = 1.5          # multiplicador global de todas las fuerzas (0.0–2.0)
+global_gain = 2.0          # multiplicador global de todas las fuerzas (0.0–2.0)
 update_hz = 15             # tasa de actualización del daemon en Hz
 
 [ffb.spring]
@@ -25,7 +25,7 @@ deadzone = 300             # fuerza mínima para activar lateral
 threshold = 500            # solo re-enviar si cambió más que esto
 
 [ffb.vibration]
-enabled = false            # habilitar vibración del motor por RPM
+enabled = true             # habilitar vibración del motor por RPM
 rpm_gain = 0.5             # intensidad de la vibración
 idle_amplitude = 500       # vibración en idle (motor encendido, parado)
 max_amplitude = 3000       # vibración máxima a RPM alto

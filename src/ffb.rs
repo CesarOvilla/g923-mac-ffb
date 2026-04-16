@@ -164,6 +164,37 @@ impl<'a> ForceFeedback<'a> {
         Ok(res[0])
     }
 
+    /// Upload a periodic sine effect for engine vibration.
+    ///
+    /// - `magnitude`: vibration amplitude (0 = no vibration, 32767 = max)
+    /// - `period_ms`: period of one cycle in ms (e.g. 40ms = 25 Hz)
+    /// - `offset`: DC offset (usually 0)
+    ///
+    /// Layout matches `hidpp_ff_upload_effect()` for `FF_PERIODIC` in the
+    /// kernel: 14 bytes, same size as constant force.
+    pub fn upload_periodic_sine(
+        &self,
+        magnitude: i16,
+        period_ms: u16,
+        offset: i16,
+    ) -> Result<u8, Error> {
+        let mut p = [0u8; 14];
+        p[1] = EFFECT_PERIODIC_SINE | EFFECT_AUTOSTART;
+        // p[2..3] = duration = 0 (infinite)
+        // p[4..5] = delay = 0
+        let mag = magnitude as u16;
+        p[6] = (mag >> 8) as u8;
+        p[7] = (mag & 0xFF) as u8;
+        let off = offset as u16;
+        p[8] = (off >> 8) as u8;
+        p[9] = (off & 0xFF) as u8;
+        p[10] = (period_ms >> 8) as u8;
+        p[11] = (period_ms & 0xFF) as u8;
+        // p[12..13] = phase = 0
+        let res = self.dev.send_sync(self.index, FN_DOWNLOAD_EFFECT, &p)?;
+        Ok(res[0])
+    }
+
     /// GetGlobalGains → (gain, boost). Both u16 BE.
     /// Per kernel default-fallback, max gain is 0xFFFF.
     pub fn get_global_gains(&self) -> Result<(u16, u16), Error> {

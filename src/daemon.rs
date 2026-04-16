@@ -73,9 +73,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut spring_slot: Option<u8> = None;
     let mut damper_slot: Option<u8> = None;
     let mut lateral_slot: Option<u8> = None;
+    let mut vibration_slot: Option<u8> = None;
     let mut last_spring: f32 = 0.0;
     let mut last_damper: f32 = 0.0;
     let mut last_lateral: f32 = 0.0;
+    let mut last_vib_mag: f32 = 0.0;
     let mut smoothed_lateral: f32 = 0.0;
     let mut last_status = Instant::now();
     let mut last_config_check = Instant::now();
@@ -109,9 +111,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(s) = spring_slot.take() { let _ = ffb.destroy(s); }
                 if let Some(s) = damper_slot.take() { let _ = ffb.destroy(s); }
                 if let Some(s) = lateral_slot.take() { let _ = ffb.destroy(s); }
+                if let Some(s) = vibration_slot.take() { let _ = ffb.destroy(s); }
                 last_spring = 0.0;
                 last_damper = 0.0;
                 last_lateral = 0.0;
+                last_vib_mag = 0.0;
                 smoothed_lateral = 0.0;
                 was_paused = true;
                 println!("  ⏸ pausa");
@@ -163,11 +167,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             last_lateral = lat;
         }
 
+        // ── Vibración del motor ────────────────────────────────────
+        let mut vib_mag: f32 = 0.0;
+        let mut vib_period: u16 = 30;
+        if cfg.vibration.enabled && t.rpm > 100.0 {
+            // Amplitud: idle_amplitude en idle, sube con RPM hasta max_amplitude
+            let rpm_ratio = ((t.rpm - 400.0) / 2000.0).clamp(0.0, 1.0);
+            vib_mag = (cfg.vibration.idle_amplitude
+                + rpm_ratio * (cfg.vibration.max_amplitude - cfg.vibration.idle_amplitude))
+                * cfg.vibration.rpm_gain * gain;
+            vib_mag = vib_mag.min(cfg.vibration.max_amplitude);
+
+            // Período: simula frecuencia de encendido de 6 cilindros
+            // firing_freq = RPM / 40 → period = 40000 / RPM
+            vib_period = (40000.0 / t.rpm).clamp(10.0, 100.0) as u16;
+
+            if (vib_mag - last_vib_mag).abs() > 200.0 || vibration_slot.is_none() {
+                if let Ok(s) = ffb.upload_periodic_sine(vib_mag as i16, vib_period, 0) {
+                    if let Some(old) = vibration_slot { let _ = ffb.destroy(old); }
+                    vibration_slot = Some(s);
+                    last_vib_mag = vib_mag;
+                }
+            }
+        } else if vibration_slot.is_some() {
+            if let Some(old) = vibration_slot.take() { let _ = ffb.destroy(old); }
+            last_vib_mag = 0.0;
+        }
+
         // ── Status ───────────────────────────────────────────────
         if last_status.elapsed() > Duration::from_secs(3) {
             println!(
-                "  {:>6.1} km/h | {:>5.0} rpm | spr {:>5} | dmp {:>5} | lat {:>+6} | gain {:.1}",
-                speed_kmh, t.rpm, coeff as i16, damp as i16, lat as i16, gain,
+                "  {:>6.1} km/h | {:>5.0} rpm | spr {:>5} | dmp {:>5} | lat {:>+6} | vib {:>4} {:>2}ms",
+                speed_kmh, t.rpm, coeff as i16, damp as i16, lat as i16,
+                vib_mag as i16, vib_period,
             );
             last_status = Instant::now();
         }
