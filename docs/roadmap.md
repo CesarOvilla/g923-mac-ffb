@@ -97,50 +97,162 @@ No es un bug — es la configuración base del firmware Logitech. No bloquea nad
 
 **Salida**: módulo `ffb::engine` expuesto internamente, suite de ejemplos manuales para tunear a mano.
 
-## Fase 3 — Input reader y parser
+## Fase 3 — Input reader y parser ✅
 
-- [ ] Abrir colección Generic Desktop Joystick (`0x01 / 0x04`)
-- [ ] Parsear report ID `0x01` según el descriptor:
-  - [ ] Steering angle (16-bit signed)
-  - [ ] Throttle, brake, clutch (8-bit cada uno)
-  - [ ] Hat switch (4-bit)
-  - [ ] 23 botones (bitmap)
-- [ ] Exponer stream de eventos para loggear/debug
-- [ ] Integrar al daemon como fuente auxiliar (no sustituye al juego como consumer)
+- [x] Abrir colección Generic Desktop Joystick (`0x01 / 0x04`)
+- [x] Parsear report ID `0x01` (11 bytes) — mapa confirmado empíricamente:
+  - [x] Steering angle (16-bit LE, bytes 5-6)
+  - [x] Throttle, brake, clutch (8-bit invertidos, bytes 7-9)
+  - [x] Hat switch (4-bit, byte 1 nibble bajo)
+  - [x] 23 botones (bitmap, bytes 1-4) — todos mapeados con nombres
+- [x] Visor en tiempo real `g923-input` con dashboard
+- [x] Calibrador guiado `g923-input` (versión calibración)
 
-## Fase 4 — Telemetry bridge ATS/ETS2
+## Fase 4 — Telemetry bridge ATS/ETS2 ✅
 
-- [ ] Evaluar el SCS Telemetry SDK oficial vs. forks comunitarios (`scs-sdk-plugin`)
-- [ ] Compilar el plugin para macOS Apple Silicon si no existe pre-built
-- [ ] Implementar lector de shared memory que publica el plugin
-- [ ] Mapear telemetría → inputs del FFB engine:
-  - Centering force = `f(speed, steering_angle)`
-  - Weight = `f(cargo_mass, speed)`
-  - Surface bumps = `f(surface_type, speed, wheel_rpm)`
-  - Collision jolts = `f(delta acceleration)`
-  - Curb feedback = `f(tire position off-road)`
-- [ ] Loop del daemon: 100–500 Hz leyendo telemetría, recalculando efectos, actualizando el wheel
-- [ ] Perfilar latencia (objetivo <5 ms telemetry → HID output)
+- [x] Plugin C (x86_64 .dylib) para SCS Telemetry SDK, corre in-process con ATS
+- [x] Publica telemetría a POSIX shared memory `/g923_telemetry`
+- [x] Daemon Rust lee shared memory + envía FFB via hidapi `macos-shared-device`
+- [x] Mapeo telemetría → FFB:
+  - [x] Centering force = spring proporcional a velocidad
+  - [x] Lateral force = constant force proporcional a `accel_x`
+  - [x] Damper = anti-oscillation proporcional a velocidad
+- [x] Descubrimiento crítico: `hidapi` feature `macos-shared-device` es OBLIGATORIO para coexistir con juegos en macOS
 
-**Milestone usable**: correr ATS/ETS2 con FFB procedural sintiendo el camión en vivo.
+**Milestone MVP v0.1.0 alcanzado**: FFB procedural en ATS, sintiendo el camión en vivo.
 
-## Fase 5 — Racing games en Sikarugir
+---
 
-- [ ] Inventario de juegos objetivo: Assetto Corsa, ACC, AMS2, Dirt Rally 2.0, etc.
-- [ ] Priorizar por qué exponen telemetría accesible:
-  - [ ] AC / ACC shared memory
-  - [ ] Dirt Rally UDP telemetry
-  - [ ] F1 UDP telemetry
-- [ ] Para cada juego con telemetría: ingestor específico en el daemon
-- [ ] Para juegos sin telemetría accesible: decidir si construir `dinput8.dll` injection dentro del bottle Sikarugir
+## v0.2 — Efectos avanzados y configuración
 
-## Fase 6 — UX, empaquetado, distribución
+### Fase 5 — Configuración TOML 🔜 próximo
 
-- [ ] `launchctl` plist para que el daemon arranque al login
-- [ ] CLI `g923` con subcomandos (`start`, `stop`, `status`, `test`, `tune`)
-- [ ] Archivo de config TOML (intensidades globales, perfiles por juego)
+Infraestructura para ajustar el FFB sin recompilar. Prerequisito para todo el tuning que sigue.
+
+- [ ] Crear `g923.toml` con la estructura de configuración:
+  ```toml
+  [ffb]
+  global_gain = 1.0          # multiplicador global (0.0–2.0)
+  update_hz = 15             # tasa de actualización del daemon
+
+  [ffb.spring]
+  base = 2000
+  per_kmh = 150
+  max = 18000
+
+  [ffb.damper]
+  base = 1000
+  per_kmh = 80
+  max = 10000
+
+  [ffb.lateral]
+  gain = 2000
+  max = 10000
+  smoothing = 0.3
+
+  [ffb.vibration]
+  enabled = true
+  rpm_gain = 0.5
+  idle_amplitude = 500
+  max_amplitude = 3000
+
+  [ffb.surface]
+  enabled = true
+  bump_gain = 1.0
+  bump_duration_ms = 80
+  ```
+- [ ] Crate `toml` como dependencia, parser en `src/config.rs`
+- [ ] El daemon lee `g923.toml` al arrancar (busca en `~/.config/g923/` y `.`)
+- [ ] Hot-reload: el daemon detecta cambios en el archivo y recarga sin reiniciar
+- [ ] Binario `g923-tune` que modifica valores del TOML interactivamente
+
+**Meta**: cambiar la intensidad del spring o lateral editando un archivo de texto, sin recompilar.
+
+### Fase 6 — Vibración del motor (RPM) 🔜
+
+Efecto periódico constante que simula la vibración del motor. Siempre presente, intensidad proporcional a RPM.
+
+- [ ] Implementar `upload_periodic_sine` en `ffb.rs`:
+  - Frecuencia = `f(RPM)` — RPM bajo = vibración lenta, RPM alto = vibración rápida
+  - Amplitud = `f(RPM, throttle)` — más gas = más vibración
+  - Amplitud mínima en idle (motor encendido pero parado)
+- [ ] Integrar al daemon: actualizar el efecto periódico cada ~0.5 segundos (no necesita frecuencia alta, RPM cambia lento)
+- [ ] Usar slot dedicado (no interferir con spring/damper/lateral)
+- [ ] Parámetros en `g923.toml` sección `[ffb.vibration]`
+
+**Milestone táctil**: sentir el motor vibrando en idle y acelerando. Sube al pisar el acelerador, baja al soltar.
+
+### Fase 7 — Baches y superficie 🔜
+
+Pulsos de fuerza por cambios en la suspensión del camión. Simula pasar por baches, topes, bordillos y cambios de pavimento.
+
+- [ ] Detector de baches: calcular `delta_suspension = abs(susp[t] - susp[t-1])` por rueda
+- [ ] Si `delta > threshold`: disparar un constant force con envelope (attack rápido, fade medio)
+  - Dirección del pulso: basada en qué rueda detectó el bache (izq vs der)
+  - Intensidad: proporcional al delta y a la velocidad
+- [ ] Detector de superficie: si `susp_deflection` oscila rápidamente (frecuencia alta), generar vibración de superficie tipo "gravilla"
+- [ ] Parámetros en `g923.toml` sección `[ffb.surface]`
+- [ ] No activar cuando el camión está parado (evitar ruido en idle)
+
+**Milestone táctil**: sentir los baches de la carretera y la diferencia entre asfalto liso y camino de tierra.
+
+### Fase 8 — Perfiles por vehículo y carga 🔜
+
+El peso del camión y la carga afectan cómo se siente la dirección. Un camión vacío se siente ligero; uno cargado con 20 toneladas se siente pesado y lento.
+
+- [ ] Leer `cargo_mass` de la telemetría (canal corregido — verificar nombre exacto)
+- [ ] Multiplicador de peso: `weight_factor = 1.0 + (cargo_mass / reference_mass)`
+  - Afecta: spring coefficient, lateral gain, damper
+  - No afecta: vibración del motor (el motor vibra igual con o sin carga)
+- [ ] Perfiles TOML por juego:
+  ```toml
+  [profiles.ats]
+  reference_mass = 15000    # kg base para el multiplicador
+  spring_multiplier = 1.0
+  lateral_multiplier = 1.0
+
+  [profiles.ets2]
+  reference_mass = 20000
+  spring_multiplier = 1.1
+  lateral_multiplier = 0.9
+  ```
+- [ ] Selector de perfil activo via TOML o argumento CLI
+
+**Milestone táctil**: sentir la diferencia entre manejar vacío y manejar con carga pesada.
+
+---
+
+## v0.3 — Empaquetado y multi-juego
+
+### Fase 9 — Packaging y CLI
+
+- [ ] `launchctl` plist para que el daemon arranque al login automáticamente
+- [ ] CLI `g923` con subcomandos:
+  - `g923 start` — arranca el daemon
+  - `g923 stop` — para el daemon
+  - `g923 status` — muestra estado (conectado, telemetría activa, efectos activos)
+  - `g923 test` — corre la suite de pruebas FFB (constant, spring, damper)
+  - `g923 tune` — editor interactivo de `g923.toml`
+  - `g923 monitor` — dashboard de telemetría en tiempo real
+- [ ] Script de instalación del plugin SCS (`g923 install-plugin ats`)
+- [ ] README público con instrucciones de instalación
+- [ ] Demo video
+
+### Fase 10 — Racing games en Sikarugir
+
+- [ ] Inventario de juegos objetivo: Assetto Corsa, ACC, AMS2, Dirt Rally 2.0, F1
+- [ ] Priorizar por telemetría accesible:
+  - [ ] Dirt Rally / F1 → UDP telemetry (más simple)
+  - [ ] AC / ACC → shared memory (similar a SCS)
+- [ ] Ingestor de telemetría por juego (módulo pluggable en el daemon)
+- [ ] Mapeo FFB específico por género (camiones vs carreras vs rally)
+
+### Fase 11 — UX final (v1.0)
+
 - [ ] Empaquetado `.pkg` o `.app` firmado y notariado
-- [ ] README público, demo video
+- [ ] GUI nativa SwiftUI (opcional) para configuración
+- [ ] Soporte de otros wheels Logitech HID++ (G920, futuros modelos)
+- [ ] README, wiki, demo video, release en GitHub
 
 ## Fuera de scope (hoy)
 
