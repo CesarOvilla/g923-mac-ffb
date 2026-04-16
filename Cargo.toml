@@ -76,3 +76,5 @@ path = "src/daemon_test.rs"
 hidapi = { version = "2.6", features = ["linux-static-hidraw", "macos-shared-device"] }
 libc = "0.2"
 rusb = "0.9"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"

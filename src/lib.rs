@@ -5,6 +5,7 @@
 // from Fase 2b onward — feature discovery, FFB effects, input parsing —
 // builds on top of the helpers in `hidpp`.
 
+pub mod config;
 pub mod ffb;
 pub mod hidpp;
 pub mod telemetry;
