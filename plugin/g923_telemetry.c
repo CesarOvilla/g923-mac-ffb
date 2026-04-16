@@ -85,9 +85,10 @@ typedef void      *scs_context_t;
 #define SCS_VALUE_TYPE_float    5
 #define SCS_VALUE_TYPE_fvector  7
 #define SCS_TELEMETRY_CHANNEL_FLAG_each_frame 2
-#define SCS_TELEMETRY_EVENT_frame_end  2
-#define SCS_TELEMETRY_EVENT_paused     3
-#define SCS_TELEMETRY_EVENT_started    4
+#define SCS_TELEMETRY_EVENT_frame_end      2
+#define SCS_TELEMETRY_EVENT_paused         3
+#define SCS_TELEMETRY_EVENT_started        4
+#define SCS_TELEMETRY_EVENT_configuration  5
 
 typedef struct { float x, y, z; } scs_value_fvector_t;
 typedef struct {
@@ -485,6 +486,19 @@ static void shm_destroy(void) {
     shm_unlink(G923_SHM_NAME);
 }
 
+// Structs para el evento de configuración (cargo mass viene por aquí)
+typedef struct {
+    scs_string_t name;       // 8
+    scs_u32_t    index;      // 4
+    scs_u32_t    _pad;       // 4
+    scs_value_t  value;      // 48
+} scs_named_value_t;         // 64 bytes en x64
+
+typedef struct {
+    scs_string_t             id;         // "job", "truck", "trailer.0", etc.
+    const scs_named_value_t *attributes; // array terminado en name=NULL
+} scs_telemetry_configuration_t;
+
 // ════════════════════════════════════════════════════════════════════
 // Telemetry callbacks
 // ════════════════════════════════════════════════════════════════════
@@ -571,9 +585,7 @@ static void on_event(scs_u32_t event, const void *info, scs_context_t ctx) {
     switch (event) {
     case SCS_TELEMETRY_EVENT_frame_end:
         g_telem.frame++;
-        // Publicar telemetría a shared memory
         if (g_shm) memcpy(g_shm, &g_telem, sizeof(g923_telemetry_t));
-        // Actualizar FFB cada N frames
         g_frame_skip++;
         if (g_frame_skip >= FFB_UPDATE_INTERVAL) {
             g_frame_skip = 0;
@@ -589,6 +601,22 @@ static void on_event(scs_u32_t event, const void *info, scs_context_t ctx) {
     case SCS_TELEMETRY_EVENT_started:
         g_telem.paused = 0;
         break;
+    case SCS_TELEMETRY_EVENT_configuration: {
+        if (!info) break;
+        const scs_telemetry_configuration_t *cfg = info;
+        if (!cfg->id || !cfg->attributes) break;
+        // Buscar cargo.mass en configuraciones "job" o "trailer"
+        for (const scs_named_value_t *attr = cfg->attributes; attr->name; attr++) {
+            if (strcmp(attr->name, "cargo.mass") == 0 &&
+                attr->value.type == SCS_VALUE_TYPE_float) {
+                g_telem.cargo_mass = attr->value.value_float;
+                char msg[64];
+                snprintf(msg, sizeof(msg), "[g923] Carga detectada: %.0f kg", g_telem.cargo_mass);
+                log_msg(msg);
+            }
+        }
+        break;
+    }
     }
 }
 
@@ -629,9 +657,10 @@ scs_result_t scs_telemetry_init(scs_u32_t version,
 
     // Registrar eventos
     if (params->register_for_event) {
-        params->register_for_event(SCS_TELEMETRY_EVENT_frame_end, on_event, NULL);
-        params->register_for_event(SCS_TELEMETRY_EVENT_paused,    on_event, NULL);
-        params->register_for_event(SCS_TELEMETRY_EVENT_started,   on_event, NULL);
+        params->register_for_event(SCS_TELEMETRY_EVENT_frame_end,      on_event, NULL);
+        params->register_for_event(SCS_TELEMETRY_EVENT_paused,        on_event, NULL);
+        params->register_for_event(SCS_TELEMETRY_EVENT_started,       on_event, NULL);
+        params->register_for_event(SCS_TELEMETRY_EVENT_configuration, on_event, NULL);
     }
 
     // Registrar canales de telemetría
