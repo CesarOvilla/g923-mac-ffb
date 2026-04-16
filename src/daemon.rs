@@ -74,11 +74,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut damper_slot: Option<u8> = None;
     let mut lateral_slot: Option<u8> = None;
     let mut vibration_slot: Option<u8> = None;
+    let mut bump_slot: Option<u8> = None;
     let mut last_spring: f32 = 0.0;
     let mut last_damper: f32 = 0.0;
     let mut last_lateral: f32 = 0.0;
     let mut last_vib_mag: f32 = 0.0;
     let mut smoothed_lateral: f32 = 0.0;
+    let mut prev_susp: [f32; 4] = [0.0; 4];
+    let mut susp_initialized = false;
+    let mut bump_cooldown: u32 = 0;
     let mut last_status = Instant::now();
     let mut last_config_check = Instant::now();
     let mut was_paused = true;
@@ -112,11 +116,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(s) = damper_slot.take() { let _ = ffb.destroy(s); }
                 if let Some(s) = lateral_slot.take() { let _ = ffb.destroy(s); }
                 if let Some(s) = vibration_slot.take() { let _ = ffb.destroy(s); }
+                if let Some(s) = bump_slot.take() { let _ = ffb.destroy(s); }
                 last_spring = 0.0;
                 last_damper = 0.0;
                 last_lateral = 0.0;
                 last_vib_mag = 0.0;
                 smoothed_lateral = 0.0;
+                susp_initialized = false;
                 was_paused = true;
                 println!("  ⏸ pausa");
             }
@@ -194,12 +200,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             last_vib_mag = 0.0;
         }
 
+        // ── Baches por suspensión ─────────────────────────────────
+        let mut bump_force: f32 = 0.0;
+        if cfg.surface.enabled && speed_kmh > 2.0 {
+            if !susp_initialized {
+                prev_susp = t.susp_deflection;
+                susp_initialized = true;
+            }
+
+            if bump_cooldown > 0 {
+                bump_cooldown -= 1;
+            } else {
+                // Detectar el mayor delta de suspensión entre las 4 ruedas
+                let mut max_delta: f32 = 0.0;
+                let mut delta_sign: f32 = 1.0;
+                for i in 0..4 {
+                    let delta = (t.susp_deflection[i] - prev_susp[i]).abs();
+                    if delta > max_delta {
+                        max_delta = delta;
+                        // Ruedas izquierdas (0,2) → empuje a izquierda; derechas (1,3) → derecha
+                        delta_sign = if i % 2 == 0 { -1.0 } else { 1.0 };
+                    }
+                }
+
+                if max_delta > cfg.surface.bump_threshold {
+                    bump_force = (max_delta * 50000.0 * cfg.surface.bump_gain * gain)
+                        .min(15000.0);
+                    let force = (bump_force * delta_sign) as i16;
+                    let dur = cfg.surface.bump_duration_ms;
+
+                    if let Ok(s) = ffb.upload_constant_envelope(
+                        force, dur + 50,
+                        255,  // attack: arranque fuerte
+                        20,   // attack rápido (20ms)
+                        0,    // fade a cero
+                        dur,  // fade = duración del bache
+                    ) {
+                        if let Some(old) = bump_slot { let _ = ffb.destroy(old); }
+                        bump_slot = Some(s);
+                    }
+                    // Cooldown: no mandar otro bache por unos frames
+                    bump_cooldown = 3;
+                }
+            }
+            prev_susp = t.susp_deflection;
+        }
+
         // ── Status ───────────────────────────────────────────────
         if last_status.elapsed() > Duration::from_secs(3) {
             println!(
-                "  {:>6.1} km/h | {:>5.0} rpm | spr {:>5} | dmp {:>5} | lat {:>+6} | vib {:>4} {:>2}ms",
+                "  {:>6.1} km/h | {:>5.0} rpm | spr {:>5} | dmp {:>5} | lat {:>+6} | vib {:>4} | bump {:>5}",
                 speed_kmh, t.rpm, coeff as i16, damp as i16, lat as i16,
-                vib_mag as i16, vib_period,
+                vib_mag as i16, bump_force as i16,
             );
             last_status = Instant::now();
         }

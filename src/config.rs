@@ -75,6 +75,7 @@ pub struct SurfaceConfig {
     pub enabled: bool,
     pub bump_gain: f32,
     pub bump_duration_ms: u16,
+    pub bump_threshold: f32,
 }
 
 // ── Defaults ─────────────────────────────────────────────────────
@@ -125,7 +126,7 @@ impl Default for VibrationConfig {
 
 impl Default for SurfaceConfig {
     fn default() -> Self {
-        Self { enabled: false, bump_gain: 1.0, bump_duration_ms: 80 }
+        Self { enabled: false, bump_gain: 1.0, bump_duration_ms: 80, bump_threshold: 0.015 }
     }
 }
 
@@ -249,5 +250,8 @@ max_amplitude = 3000       # vibración máxima a RPM alto
 enabled = false            # habilitar baches por deflexión de suspensión
 bump_gain = 1.0            # intensidad de los baches
 bump_duration_ms = 80      # duración de cada pulso de bache
+bump_threshold = 0.015     # cambio mínimo en suspensión para disparar bache
+                           # subir si sientes pulsos en carretera lisa (0.03–0.05)
+                           # bajar si no sientes baches reales (0.005–0.01)
 "#.to_string()
 }
