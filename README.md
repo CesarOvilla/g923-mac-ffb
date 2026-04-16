@@ -39,7 +39,7 @@ Este proyecto habla directamente con el G923 vía **HID++ 4.2** (el protocolo pr
 - **Logitech G923 Racing Wheel** variante **Xbox/PC** (PID `0xc26e`)
 - **Rust** (para compilar)
 - **American Truck Simulator** o **Euro Truck Simulator 2** via Steam
-- Homebrew: `brew install libusb` (dependencia de compilación)
+- **clang** (incluido con Xcode Command Line Tools) para compilar el plugin C
 
 > **Nota**: este proyecto es para la variante **Xbox** del G923 (`0xc26e`), no la PlayStation (`0xc266`). La variante PS usa un protocolo diferente — para esa, usa [fffb](https://github.com/eddieavd/fffb).
 

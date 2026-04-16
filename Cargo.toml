@@ -64,21 +64,10 @@ path = "src/cli.rs"
 name = "g923-daemon"
 path = "src/daemon.rs"
 
-[[bin]]
-name = "g923-usb-test"
-path = "src/usb_test.rs"
-
-[[bin]]
-name = "g923-classic-test"
-path = "src/classic_test.rs"
-
-[[bin]]
-name = "g923-daemon-test"
-path = "src/daemon_test.rs"
 
 [dependencies]
 hidapi = { version = "2.6", features = ["linux-static-hidraw", "macos-shared-device"] }
 libc = "0.2"
-rusb = "0.9"
+
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
