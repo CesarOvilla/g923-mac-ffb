@@ -45,7 +45,11 @@ Este proyecto habla directamente con el G923 vía **HID++ 4.2** (el protocolo pr
 
 > **Nota**: este proyecto es para la variante **Xbox** del G923 (`0xc26e`), no la PlayStation (`0xc266`). La variante PS usa un protocolo diferente — para esa, usa [fffb](https://github.com/eddieavd/fffb).
 
-## Instalación
+## Instalación rápida (desde DMG)
+
+Descarga el `.dmg` más reciente de [Releases](../../releases), ábrelo y doble-click en **"Instalar.command"**. Copia binarios, config, plugin y servicio automáticamente. Después solo abre ATS y maneja.
+
+## Compilar desde código fuente
 
 ### 1. Compilar
 
@@ -126,7 +130,16 @@ g923 status             # Muestra estado
 g923 log                # Muestra el log en tiempo real
 g923 install-service    # Auto-start al login
 g923 uninstall-service  # Quita auto-start
-g923 test               # Suite de pruebas FFB
+g923 uninstall          # Desinstala TODO (binarios, config, servicio)
+g923 version            # Muestra la versión instalada
+```
+
+### App de barra de menú (opcional)
+
+Una utilidad ligera que vive en la barra de menú. Muestra un icono verde/rojo indicando el estado del daemon, y permite iniciar/detener, abrir la config o ver logs — todo sin abrir Terminal.
+
+```bash
+~/.local/bin/G923FFB &
 ```
 
 ## Configuración

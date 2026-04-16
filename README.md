@@ -174,6 +174,38 @@ reference_mass = 20000     # reference mass in kg
 max_multiplier = 1.8       # maximum weight multiplier
 ```
 
+## Architecture
+
+```
+g923-mac-ffb/
+├── src/
+│   ├── lib.rs              # Main crate
+│   ├── hidpp.rs            # HID++ 4.2 transport (long + very-long reports)
+│   ├── ffb.rs              # ForceFeedback feature 0x8123 client
+│   ├── telemetry.rs        # POSIX shared memory reader
+│   ├── config.rs           # TOML parser with hot-reload
+│   ├── daemon.rs           # Main loop: telemetry → FFB
+│   ├── cli.rs              # CLI g923 (start/stop/status/install)
+│   ├── input.rs            # Joystick input viewer
+│   └── *.rs                # Test/diagnostic binaries
+├── app/
+│   └── G923FFB.swift       # Menu bar app (optional)
+├── plugin/
+│   ├── g923_telemetry.c    # SCS plugin (x86_64, runs inside ATS)
+│   └── build.sh            # Compile plugin with clang
+├── dist/
+│   ├── Instalar.command    # One-click installer
+│   └── build-dmg.sh        # Build distributable DMG
+├── docs/
+│   ├── hardware-discovery.md
+│   ├── hidpp-protocol.md
+│   ├── architecture.md
+│   ├── roadmap.md
+│   └── references.md
+├── g923.toml               # FFB configuration
+└── Cargo.toml
+```
+
 ## Diagnostic Tools
 
 ```bash
