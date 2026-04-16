@@ -68,9 +68,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func daemonPath() -> String {
-        let bundle = Bundle.main.bundlePath
-        let dir = (bundle as NSString).deletingLastPathComponent
-        return (dir as NSString).appendingPathComponent(daemonName)
+        // Buscar en el mismo directorio que este binario
+        let selfPath = ProcessInfo.processInfo.arguments[0]
+        let dir = (selfPath as NSString).deletingLastPathComponent
+        let sameDirPath = (dir as NSString).appendingPathComponent(daemonName)
+        if FileManager.default.fileExists(atPath: sameDirPath) {
+            return sameDirPath
+        }
+        // Fallback: ~/.local/bin/
+        let home = NSHomeDirectory()
+        return (home as NSString).appendingPathComponent(".local/bin/\(daemonName)")
     }
 
     func configPath() -> String {
