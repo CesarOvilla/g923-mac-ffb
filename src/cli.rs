@@ -29,6 +29,7 @@ fn main() {
         "uninstall-service" => cmd_uninstall_service(),
         "log" => cmd_log(),
         "test" => cmd_test(),
+        "uninstall" => cmd_uninstall(),
         "help" | "--help" | "-h" => cmd_help(),
         other => {
             eprintln!("Comando desconocido: {other}");
@@ -48,6 +49,7 @@ fn cmd_help() {
     println!("  status             Muestra si el daemon está corriendo");
     println!("  install-service    Instala servicio launchctl (auto-start al login)");
     println!("  uninstall-service  Quita el servicio launchctl");
+    println!("  uninstall          Desinstala TODO (binarios, config, servicio)");
     println!("  log                Muestra el log del daemon");
     println!("  test               Corre la suite de pruebas FFB");
     println!("  help               Muestra esta ayuda");
@@ -262,6 +264,61 @@ fn cmd_uninstall_service() {
     } else {
         println!("⚠ No hay servicio instalado.");
     }
+}
+
+fn cmd_uninstall() {
+    println!("⚠ Esto va a desinstalar G923 FFB completamente:");
+    println!("  - Detener el daemon");
+    println!("  - Quitar servicio launchctl");
+    println!("  - Eliminar binarios de ~/.local/bin/");
+    println!("  - Eliminar config de ~/.config/g923/");
+    println!("  - Eliminar log");
+    println!();
+    print!("¿Continuar? (s/N): ");
+    use std::io::Write;
+    std::io::stdout().flush().ok();
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).ok();
+    if !input.trim().eq_ignore_ascii_case("s") {
+        println!("Cancelado.");
+        return;
+    }
+
+    // Detener daemon
+    cmd_stop();
+
+    // Quitar servicio
+    let plist = plist_path();
+    if plist.exists() {
+        let _ = fs::remove_file(&plist);
+        println!("  ✓ Servicio eliminado.");
+    }
+
+    // Eliminar binarios
+    let bin_dir = env::var("HOME").unwrap_or_default();
+    let bin_path = Path::new(&bin_dir).join(".local/bin");
+    for name in &["g923-daemon", "g923", "G923FFB"] {
+        let p = bin_path.join(name);
+        if p.exists() {
+            let _ = fs::remove_file(&p);
+        }
+    }
+    println!("  ✓ Binarios eliminados.");
+
+    // Eliminar config
+    let config = Path::new(&bin_dir).join(".config/g923");
+    if config.exists() {
+        let _ = fs::remove_dir_all(&config);
+        println!("  ✓ Configuración eliminada.");
+    }
+
+    // Eliminar log
+    let _ = fs::remove_file(LOG_PATH);
+
+    println!();
+    println!("✓ G923 FFB desinstalado completamente.");
+    println!("  El plugin de ATS (g923_telemetry.dylib) sigue en el bundle del juego.");
+    println!("  Puedes quitarlo manualmente si quieres.");
 }
 
 fn cmd_log() {
