@@ -1,259 +1,223 @@
+🇪🇸 [Leer en español](README.es.md)
+
 # g923-mac-ffb
 
-**Force Feedback para Logitech G923 Racing Wheel (Xbox) en macOS Apple Silicon.**
+**Force Feedback for the Logitech G923 Racing Wheel (Xbox) on macOS Apple Silicon.**
 
-Driver userspace 100% — sin DriverKit, sin kexts, sin cuenta de desarrollador pagada. Funciona con American Truck Simulator y Euro Truck Simulator 2.
+100% userspace driver — no DriverKit, no kexts, no paid developer account. Works with American Truck Simulator and Euro Truck Simulator 2.
 
-## El problema
+## The Problem
 
-El Logitech G923 (variante Xbox, PID `0xc26e`) no tiene soporte oficial de Force Feedback en macOS. Logitech nunca actualizó sus drivers para Apple Silicon, y macOS eliminó el soporte de kexts necesario para el framework `ForceFeedback.framework` legacy. El volante funciona como joystick (ejes, pedales, botones), pero los motores FFB quedan completamente muertos.
+The Logitech G923 Xbox variant (PID `0xc26e`) has no official Force Feedback support on macOS. Logitech never updated their drivers for Apple Silicon, and macOS dropped kext support needed by the legacy `ForceFeedback.framework`. The wheel works as a joystick (axes, pedals, buttons), but the FFB motors are completely dead.
 
-## La solución
+## The Solution
 
-Este proyecto habla directamente con el G923 vía **HID++ 4.2** (el protocolo propietario de Logitech) desde userspace, usando `hidapi` sobre `IOHIDManager`. Un plugin de telemetría corre dentro del juego, publica datos a shared memory, y un daemon externo traduce esa telemetría a comandos FFB que envía al volante.
+This project communicates directly with the G923 via **HID++ 4.2** (Logitech's proprietary protocol) from userspace, using `hidapi` over `IOHIDManager`. A telemetry plugin runs inside the game, publishes data to shared memory, and a separate daemon translates that telemetry into FFB commands sent to the wheel.
 
 ```
-┌──────────────┐   telemetría   ┌─────────────────┐   HID++ 4.2   ┌───────┐
+┌──────────────┐   telemetry    ┌─────────────────┐   HID++ 4.2   ┌───────┐
 │ ATS / ETS2   │──────────────▶ │ g923-daemon     │──────────────▶ │ G923  │
-│ (plugin .dylib) shm POSIX    │ (Rust, arm64)   │  USB reports   │ Xbox  │
+│ (plugin .dylib) POSIX shm    │ (Rust, arm64)   │  USB reports   │ Xbox  │
 └──────────────┘               └─────────────────┘               └───────┘
 ```
 
-## Efectos FFB soportados
+## Supported FFB Effects
 
-| Efecto | Descripción | Uso |
+| Effect | Description | Use |
 |--------|-------------|-----|
-| **Spring** | Autocentrado proporcional a velocidad | Más rápido = volante más firme |
-| **Damper** | Resistencia a velocidad angular | Anti-oscillación, suaviza movimientos |
-| **Constant Force** | Fuerza lateral en curvas | Sientes las G en las curvas |
-| **Periodic Sine** | Vibración del motor por RPM | Sientes el motor vibrando |
-| **Bumps** | Pulsos por deflexión de suspensión | Baches y cambios de superficie |
-| **Weight** | Multiplicador por carga | Camión cargado = dirección más pesada |
-| Friction | Drag constante | Disponible en la librería |
-| Inertia | Masa virtual | Disponible en la librería |
+| **Spring** | Speed-proportional centering | Faster = stiffer wheel |
+| **Damper** | Angular velocity resistance | Anti-oscillation, smooths input |
+| **Constant Force** | Lateral force in turns | Feel the G-forces in curves |
+| **Periodic Sine** | Engine vibration by RPM | Feel the engine rumble |
+| **Bumps** | Suspension deflection pulses | Road bumps and surface changes |
+| **Weight** | Cargo mass multiplier | Loaded truck = heavier steering |
+| Friction | Constant drag | Available in the library |
+| Inertia | Virtual mass | Available in the library |
 
-## Requisitos
+## Requirements
 
-- **Mac con Apple Silicon** (M1, M2, M3, M4)
-- **macOS Sonoma 14+** (probado en macOS 26.4/Tahoe)
-- **Logitech G923 Racing Wheel** variante **Xbox/PC** (PID `0xc26e`)
-- **Rust** (para compilar)
-- **American Truck Simulator** o **Euro Truck Simulator 2** via Steam
-- **clang** (incluido con Xcode Command Line Tools) para compilar el plugin C
+- **Apple Silicon Mac** (M1, M2, M3, M4)
+- **macOS Sonoma 14+** (tested on macOS 26.4/Tahoe)
+- **Logitech G923 Racing Wheel**, **Xbox/PC** variant (PID `0xc26e`)
+- **Rust** toolchain (to build from source)
+- **American Truck Simulator** or **Euro Truck Simulator 2** via Steam
+- **clang** (included with Xcode Command Line Tools) for the C plugin
 
-> **Nota**: este proyecto es para la variante **Xbox** del G923 (`0xc26e`), no la PlayStation (`0xc266`). La variante PS usa un protocolo diferente — para esa, usa [fffb](https://github.com/eddieavd/fffb).
+> **Note**: this project targets the **Xbox** variant of the G923 (`0xc26e`), not the PlayStation variant (`0xc266`). The PS variant uses a different protocol — use [fffb](https://github.com/eddieavd/fffb) for that one.
 
-## Instalación
+## Quick Install (from DMG)
 
-### 1. Compilar
+Download the latest `.dmg` from [Releases](../../releases), open it, and double-click **"Instalar.command"**. It copies all binaries, sets up the config, and installs the auto-start service. Then just open ATS and drive.
+
+## Build from Source
+
+### 1. Compile
 
 ```bash
-git clone https://github.com/tu-usuario/g923-mac-ffb.git
+git clone https://github.com/your-user/g923-mac-ffb.git
 cd g923-mac-ffb
 cargo build --release
 ```
 
-### 2. Instalar el plugin de telemetría en ATS
+### 2. Install the telemetry plugin in ATS
 
-El plugin es un `.dylib` x86_64 que se carga dentro del proceso del juego:
+The plugin is an x86_64 `.dylib` loaded by the game process:
 
 ```bash
-# Compilar el plugin
+# Build the plugin
 bash plugin/build.sh
 
-# Copiar al directorio de plugins de ATS (requiere acceso al .app bundle)
-# Si macOS bloquea la copia, hazlo manualmente desde Finder:
-# Click derecho en ATS.app → Mostrar contenido → Contents/MacOS → crear carpeta "plugins"
+# Copy to ATS plugins directory
+# If macOS blocks the copy, do it manually from Finder:
+# Right-click ATS.app → Show Package Contents → Contents/MacOS → create "plugins" folder
 cp plugin/g923_telemetry.dylib \
   ~/Library/Application\ Support/Steam/steamapps/common/\
   American\ Truck\ Simulator/American\ Truck\ Simulator.app/\
   Contents/MacOS/plugins/
 ```
 
-> La primera vez que abras ATS con el plugin, aparece un diálogo de advertencia del SDK. Es normal — acepta y continúa.
+> On first launch with the plugin, ATS shows an SDK warning dialog. This is normal — accept and continue.
 
-### 3. Configurar el daemon
+### 3. Set up the daemon
 
 ```bash
-# Primera ejecución: genera g923.toml con valores por defecto
+# First run generates g923.toml with documented defaults
 ./target/release/g923-daemon
-# (Ctrl+C después de verificar que genera el archivo)
+# (Ctrl+C after verifying the config file is created)
 
-# Opcionalmente, mover la config a ~/.config/g923/
+# Optionally move config to the standard location
 mkdir -p ~/.config/g923
 mv g923.toml ~/.config/g923/
 ```
 
-### 4. Instalar como servicio (auto-start)
+### 4. Install as a service (auto-start)
 
 ```bash
-# Instala servicio launchctl — el daemon arranca al iniciar sesión
 ./target/release/g923 install-service
-
-# Arrancarlo ahora
 ./target/release/g923 start
-
-# Verificar
 ./target/release/g923 status
 ```
 
-## Uso
+## Usage
 
-### Con servicio instalado (recomendado)
+### With service installed (recommended)
 
-1. Enciende la Mac (el daemon arranca solo)
-2. Abre ATS/ETS2 desde Steam
-3. Maneja — el FFB se activa automáticamente al detectar telemetría
+1. Turn on your Mac (daemon starts automatically)
+2. Open ATS/ETS2 from Steam
+3. Drive — FFB activates automatically when telemetry is detected
 
 ### Manual
 
 ```bash
-# Terminal 1: daemon
 ./target/release/g923-daemon
-
-# Terminal 2 (o Steam): abrir ATS
-# El daemon detecta la telemetría y activa FFB
+# Then open ATS in another window
 ```
 
 ### CLI
 
 ```bash
-g923 start              # Arranca el daemon en background
-g923 stop               # Detiene el daemon
-g923 status             # Muestra estado
-g923 log                # Muestra el log en tiempo real
-g923 install-service    # Auto-start al login
-g923 uninstall-service  # Quita auto-start
-g923 test               # Suite de pruebas FFB
+g923 start              # Start daemon in background
+g923 stop               # Stop daemon
+g923 status             # Show status
+g923 log                # Tail the daemon log
+g923 install-service    # Auto-start on login
+g923 uninstall-service  # Remove auto-start
+g923 uninstall          # Remove everything (binaries, config, service)
 ```
 
-## Configuración
+### Menu Bar App (optional)
 
-Edita `g923.toml` (en `~/.config/g923/` o el directorio actual). **El daemon recarga cambios automáticamente cada 5 segundos** — no necesitas reiniciar.
+A lightweight menu bar utility is included. It shows a green/red icon indicating daemon status, and lets you start/stop, open config, or view logs — all without opening Terminal.
+
+```bash
+~/.local/bin/G923FFB &
+```
+
+## Configuration
+
+Edit `g923.toml` (in `~/.config/g923/` or the current directory). **The daemon hot-reloads changes every 5 seconds** — no restart needed.
 
 ```toml
 [ffb]
-global_gain = 1.0          # multiplicador global (0.0–2.0)
-update_hz = 15             # tasa de actualización
+global_gain = 1.0          # global multiplier (0.0–2.0)
+update_hz = 15             # daemon update rate
 
 [ffb.spring]
-base = 2000                # autocentrado con el camión parado
-per_kmh = 150              # cuánto sube por km/h
-max = 18000                # máximo
+base = 2000                # centering force when stopped
+per_kmh = 150              # increase per km/h
+max = 18000                # maximum
 
 [ffb.damper]
-base = 1000                # amortiguamiento base
-per_kmh = 80               # sube por km/h
-max = 10000                # máximo
+base = 1000                # base damping
+per_kmh = 80               # increase per km/h
+max = 10000                # maximum
 
 [ffb.lateral]
-gain = 2000                # intensidad en curvas
-max = 10000                # máximo
-smoothing = 0.3            # suavizado (0.0–0.9)
+gain = 2000                # lateral force intensity in curves
+max = 10000                # maximum
+smoothing = 0.3            # smoothing factor (0.0–0.9)
 
 [ffb.vibration]
-enabled = true             # vibración del motor por RPM
-rpm_gain = 0.5             # intensidad
-idle_amplitude = 500       # vibración en idle
-max_amplitude = 3000       # vibración a RPM alto
+enabled = true             # engine vibration by RPM
+rpm_gain = 0.5             # intensity
+idle_amplitude = 500       # vibration at idle
+max_amplitude = 3000       # vibration at high RPM
 
 [ffb.surface]
-enabled = true             # baches por suspensión
-bump_gain = 1.0            # intensidad
-bump_threshold = 0.015     # sensibilidad (subir si hay falsos positivos)
+enabled = true             # bumps from suspension deflection
+bump_gain = 1.0            # intensity
+bump_threshold = 0.015     # sensitivity (raise if false positives on smooth roads)
 
 [ffb.weight]
-enabled = true             # más peso = dirección más dura
-reference_mass = 20000     # kg de referencia
-max_multiplier = 1.8       # multiplicador máximo
+enabled = true             # heavier cargo = heavier steering
+reference_mass = 20000     # reference mass in kg
+max_multiplier = 1.8       # maximum weight multiplier
 ```
 
-## Herramientas de diagnóstico
+## Diagnostic Tools
 
 ```bash
-# Enumerar colecciones HID del G923
-cargo run --bin g923-enumerate
-
-# Ping HID++ (verificar comunicación)
-cargo run --bin g923-ping
-
-# Descubrir features del firmware
-cargo run --bin g923-discover
-
-# Test de efectos individuales
-cargo run --bin g923-constant-force
-cargo run --bin g923-spring
-cargo run --bin g923-damper
-cargo run --bin g923-friction
-cargo run --bin g923-inertia
-cargo run --bin g923-envelope
-
-# Visor de input en tiempo real (steering, pedales, botones)
-cargo run --bin g923-input
-
-# Monitor de telemetría ATS
-cargo run --bin g923-telemetry-monitor
+cargo run --bin g923-enumerate       # List G923 HID collections
+cargo run --bin g923-ping            # HID++ protocol version check
+cargo run --bin g923-discover        # Firmware feature table
+cargo run --bin g923-constant-force  # Test constant force effect
+cargo run --bin g923-spring          # Test spring effect
+cargo run --bin g923-damper          # Test damper effect
+cargo run --bin g923-input           # Real-time input viewer
+cargo run --bin g923-telemetry-monitor  # Real-time ATS telemetry
 ```
 
-## Arquitectura
+## G923 Xbox Quirks on macOS
 
-```
-g923-mac-ffb/
-├── src/
-│   ├── lib.rs              # Crate principal
-│   ├── hidpp.rs            # Transporte HID++ 4.2 (long + very-long reports)
-│   ├── ffb.rs              # Cliente ForceFeedback feature 0x8123
-│   ├── telemetry.rs        # Lector de shared memory POSIX
-│   ├── config.rs           # Parser TOML con hot-reload
-│   ├── daemon.rs           # Loop principal: telemetría → FFB
-│   ├── cli.rs              # CLI g923 (start/stop/status/install)
-│   ├── input.rs            # Visor de input del joystick
-│   └── *.rs                # Binarios de test/diagnóstico
-├── plugin/
-│   ├── g923_telemetry.c    # Plugin SCS (x86_64, corre dentro de ATS)
-│   ├── build.sh            # Compila el plugin con clang
-│   └── install.sh          # Instala el plugin en ATS
-├── docs/
-│   ├── hardware-discovery.md   # Dump USB, colecciones HID, descriptors
-│   ├── hidpp-protocol.md       # Protocolo HID++ 4.2, quirks del G923 Xbox
-│   ├── architecture.md         # Diseño del daemon
-│   ├── roadmap.md              # Fases completadas y futuras
-│   └── references.md           # Repos y docs de referencia
-├── g923.toml               # Configuración FFB
-└── Cargo.toml
-```
+These behaviors are specific to the Xbox variant (`0xc26e`) and were discovered during development:
 
-## Quirks del G923 Xbox en macOS
+1. **`SetEffectState(PLAY)` is silently ignored** — the firmware ACKs but never activates. Effects must use the `EFFECT_AUTOSTART (0x80)` bit on `DownloadEffect`.
 
-Estos comportamientos son específicos de la variante Xbox (`0xc26e`) y no están documentados en ningún otro proyecto:
+2. **Force sign is inverted** — the Linux kernel (G920) uses `+force = right`. The G923 Xbox uses `+force = left`. The library compensates internally.
 
-1. **`SetEffectState(PLAY)` es ignorado** — el firmware acepta el comando sin error pero nunca activa el efecto. La única forma de ejecutar efectos es con el bit `EFFECT_AUTOSTART (0x80)` en `DownloadEffect`.
+3. **Replies on report ID `0x12`** — the G923 responds with very-long reports (64 bytes) even when the request was sent as long (20 bytes).
 
-2. **Signo de fuerza invertido** — el kernel Linux (G920) usa `+force = derecha`. El G923 Xbox usa `+force = izquierda`. La librería compensa internamente.
+4. **`hidapi` requires `macos-shared-device`** — without this feature flag, `hidapi` opens in exclusive mode, disconnecting `GameController.framework` and killing game input. This was the most critical discovery of the project.
 
-3. **Replies en report ID `0x12`** — el G923 responde en very-long reports (64 bytes) aunque el request vaya en long (20 bytes).
+5. **Vendor collection `0xFF43` invisible under Rosetta** — x86_64 processes (like ATS) cannot see the HID++ collections. FFB must run from a native arm64 daemon, not from an in-process plugin.
 
-4. **`hidapi` requiere `macos-shared-device`** — sin esta feature flag, `hidapi` abre el device en modo exclusivo, desconectando el `GameController.framework` y matando el input del juego. Este fue el descubrimiento más crítico del proyecto.
+6. **`SetAperture` (lock rotation range) is ignored** — the firmware accepts but doesn't change the physical range.
 
-5. **Colección vendor `0xFF43` invisible bajo Rosetta** — procesos x86_64 (como ATS) no ven las colecciones HID++ del G923. Por eso el FFB debe correr desde un daemon arm64 nativo, no desde un plugin in-process.
+## Known Limitations
 
-6. **`SetAperture` (lock rotation range) es ignorado** — el firmware acepta pero no cambia el rango físico. El control de rango probablemente vive en una feature `0x80xx` sin documentar.
+- Only works with the **Xbox** variant of the G923 (`0xc26e`)
+- Only tested with **ATS** (ETS2 should work identically — same SDK)
+- The telemetry plugin requires write access to the ATS `.app` bundle
+- No classic lg4ff protocol support (G29/G920/G923 PS use a different protocol)
+- Rotation range lock not available (use Logitech GHub instead)
 
-## Limitaciones conocidas
+## References
 
-- Solo funciona con la variante **Xbox** del G923 (`0xc26e`)
-- Solo probado con **ATS** (ETS2 debería funcionar igual — mismo SDK)
-- El plugin de telemetría requiere acceso al `.app` bundle de ATS (puede requerir quitar protecciones)
-- No soporta protocolo clásico lg4ff (G29/G920/G923 PS usan protocolo diferente)
-- Lock rotation range no funciona (usa Logitech GHub para cambiarlo)
+- [hid-logitech-hidpp.c](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-logitech-hidpp.c) — Linux kernel HID++ driver (primary protocol reference)
+- [new-lg4ff](https://github.com/berarma/new-lg4ff) — Classic FFB driver for Linux (NOT compatible with G923 Xbox)
+- [fffb](https://github.com/eddieavd/fffb) — FFB for G29/G923 PS on macOS (classic protocol, architectural inspiration)
+- [SDL3 PR #11598](https://github.com/libsdl-org/SDL/pull/11598) — Classic FFB in SDL3
 
-## Referencias
-
-- [hid-logitech-hidpp.c](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-logitech-hidpp.c) — driver HID++ del kernel Linux (referencia principal del protocolo)
-- [new-lg4ff](https://github.com/berarma/new-lg4ff) — driver FFB clásico para Linux (NO compatible con G923 Xbox)
-- [fffb](https://github.com/eddieavd/fffb) — FFB para G29/G923 PS en macOS (protocolo clásico, inspiración arquitectónica)
-- [SDL3 PR #11598](https://github.com/libsdl-org/SDL/pull/11598) — FFB clásico en SDL3
-
-## Licencia
+## License
 
 MIT
