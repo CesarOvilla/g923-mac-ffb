@@ -271,4 +271,4 @@ Estos comportamientos son específicos de la variante Xbox (`0xc26e`) y no está
 
 ## Licencia
 
-MIT
+MIT — ver [CREDITS.md](CREDITS.md) para agradecimientos.

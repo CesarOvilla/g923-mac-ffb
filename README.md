@@ -252,4 +252,4 @@ These behaviors are specific to the Xbox variant (`0xc26e`) and were discovered 
 
 ## License
 
-MIT
+MIT — see [CREDITS.md](CREDITS.md) for acknowledgments.
